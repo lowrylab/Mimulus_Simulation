@@ -1,0 +1,395 @@
+#Mimulus simulation
+#Authors: Eric LoPresti and Kathy Toll
+
+############################
+#outcrossed parameters, to be used for both outcrossed and the first generation
+#of the inbred
+#change the values for nudatus versus guttatus - or to play with whatever
+#other simulations you would like
+###########################
+
+
+#so a single (outcrossed) seed arrives, and has Ge chance of germinating
+#numbers in script filled in from table, change to suit whatever simulation
+#is being done (i.e. outcrossed versus inbred, guttatus versus nudatus)
+
+#outcrossed germination
+GeO<-.486
+#since germination is a binomial (0,1) outcome, use rbinom to make a table
+#of random draws for germination
+GeODist<-rbinom(100000, size=1, prob=GeO)
+
+#outcrossed survival
+SuO<-.197
+#since survival is a binomial (0,1) outcome, use rbinomto make a table
+#of random draws for survival to flowering
+SuODist<-rbinom(100000, size=1, prob=SuO)
+
+#outcrossed seed production, totals
+SeO<-2.44
+SeOsd<-10.25
+#this should be a poisson distribution, BUT, since variance is not equal to mean
+#we'll use a normal distribution, but truncate it so that all negative cases
+#equal zero
+SeODist<-rnorm(10000, mean=SeO, sd=SeOsd)
+SeODist[SeODist<0] <- 0
+#now round to nearst integer, since seeds are necessarily whole
+SeODist<-round(SeODist)
+
+#now, since some of those seeds will not be viable, because of hybridization
+#use the hybridization data from Toll & Willis (2017), as the arrays were
+#smaller and thus are closer to the actual expected hybridization for
+#an individual plant
+
+#HyO=viability (1-hybridization)
+HyO<-0.346
+#again a binomial at the individual seed level
+HyODist<-rbinom(1000000, size=1, prob=HyO)
+
+#ok, so now we can make an estimate based on one seed landing in a new
+#environment and outcrossing for X generations
+
+#but first, we need to take into account seed survival
+#using Toll & Willis (2017) again. Unfortunately, making
+#estimates for inbreeding effect on survival is not possible.
+
+#seed survival
+SeSu<-.01 # 1 in 10 seeds survives, probably a 100x more than actual, but the upper bound from Toll and Willis 2018
+SeSuDist<-rbinom(1000000, size=1, prob=SeSu)
+
+#single seed lines to be simulated (i.e. a single seed into occupied
+#heterospecific habitat).
+reps <- 10000
+
+#############################
+#actually multiple generation outcrossing simulation
+#change parameters above based on species and whatever parameters you
+#would like to simulate
+#############################
+
+
+#n=reps simulations of 1 seed
+sims<-rep(1, reps)
+simresults<-rep(1,reps)
+
+outcrossed<-as.data.frame(sims)
+colnames(outcrossed)<-("zerogen")
+
+#first loop, to generate total seeds
+for(i in 1:reps) {
+    int <- sims[i]*sample(GeODist, 1)* #1 seed to start*germination
+sample(SuODist, 1)* #survival
+sample(SeODist, 1)  #seedset
+  sims[i]<-int}
+
+#second loop, to generate viable seeds
+for(i in 1:reps) {
+    int2 <- sum(sample(HyODist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  simresults[i]<-int2}
+
+for(i in 1:reps) {
+    int2 <- sum(sample(SeSuDist, simresults[i], replace=TRUE)) #sums whether each seed produced survives
+  simresults[i]<-int2}
+
+#now the output is stored as "simresults"
+#and we can play with it:
+range(simresults)
+hist(simresults)
+mean(simresults)
+
+#and then use it to generate the next generation and re-iterate those steps
+
+sum(simresults) #number of seeds for the next generation (!)
+
+#for outcrossed seeds, let's follow these lines for three generations
+
+#save these data
+outcrossed$firstgen<-simresults
+
+#now for second generation, split by stages
+#number germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(GeODist, outcrossed$firstgen[i], replace=TRUE))
+sims[i] <- int }
+
+#number survived of those which germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(SuODist, sims[i], replace=TRUE))
+sims[i]<-int }
+#seed set of those survivors
+for(i in 1:reps) {
+    int <- sum(sample(SeODist, sims[i], replace=TRUE))
+sims[i]<-int }
+#viable seeds
+for(i in 1:reps) {
+    int <- sum(sample(HyODist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+#surviving seeds
+for(i in 1:reps) {
+    int <- sum(sample(SeSuDist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+
+
+outcrossed$secondgen<-as.vector(sims)
+sum(outcrossed$secondgen) #number seeds produced
+
+#now for third generation, split by stages
+#number germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(GeODist, outcrossed$secondgen[i], replace=TRUE))
+sims[i]<-int }
+#number survived of those which germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(SuODist, sims[i], replace=TRUE))
+sims[i]<-int }
+#seed set of those survivors
+for(i in 1:reps) {
+    int <- sum(sample(SeODist, sims[i], replace=TRUE))
+sims[i]<-int }
+#viable seeds
+for(i in 1:reps) {
+    int <- sum(sample(HyODist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+#surviving seeds
+for(i in 1:reps) {
+    int <- sum(sample(SeSuDist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+
+
+
+outcrossed$thirdgen<-as.vector(sims)
+
+matplot(t(outcrossed), type = "l", xlim=c(1,4), ylim=c(0,10), ylab="Pop. Size",
+col = rgb(red = 1, green = 0, blue = 1, alpha = 0.1), xlab="Generation")
+
+#number of lines that went to zero
+sum(outcrossed$firstgen==0, na.rm=TRUE)# in this sim  85%
+sum(outcrossed$secondgen==0, na.rm=TRUE)# in this sim  96%
+sum(outcrossed$thirdgen==0, na.rm=TRUE)# in this sim  99%
+
+text(x=c(1.25,2,3,3.75), y=c(6,5,5,5), c("0% loss", "Out - 85%", "Out - 97%", "Out - 99.2%"))
+
+#change name for whatever simulation is done
+#in this case, nudatus
+#write.csv(outcrossed, file="OutcrossedNudatus.csv")
+
+
+
+
+
+
+
+
+##########################################################
+#now let's simulate it for selfing over 3 generations, in the same seep
+#so a single (outcrossed) seed arrives, and has Ge1 chance of germinating
+###############################################################
+
+#outcrossed germination (this first generation is the same as in the outcrossed
+#simulation, of course)
+
+GeO<-0.486
+#since germination is a binomial (0,1) outcome, use rbinom
+GeODist<-rbinom(100000, size=1, prob=GeO)
+#selfing germ
+Ge1<-.38
+Ge2<-.39
+Ge3<-.45
+Ge1Dist<-rbinom(100000, size=1, prob=Ge1)
+Ge2Dist<-rbinom(100000, size=1, prob=Ge2)
+Ge3Dist<-rbinom(100000, size=1, prob=Ge3)
+
+
+#outcrossed survival
+SuO<-0.198
+#since survival is a binomial (0,1) outcome, use rbinom
+SuODist<-rbinom(100000, size=1, prob=SuO)
+Su1<-0.038
+Su2<-0
+Su3<-0
+Su1Dist<-rbinom(100000, size=1, prob=Su1)
+Su2Dist<-rbinom(100000, size=1, prob=Su2)
+Su3Dist<-rbinom(100000, size=1, prob=Su3)
+
+
+#outcrossed seed production, totals
+SeO<-2.44
+SeOsd<-10.25
+#this is a poisson distribution, BUT, since variance is not equal to mean
+#we'll use a normal distribution, but truncate it so that all negative cases
+#equal zero
+SeODist<-rnorm(10000, mean=SeO, sd=SeOsd)
+SeODist[SeODist<0] <- 0
+#now round to nearst integert
+SeODist<-round(SeODist)
+
+
+Se1<-0
+Se1sd<-0
+Se1Dist<-rnorm(10000, mean=Se1, sd=Se1sd)
+Se1Dist[Se1Dist<0] <- 0
+Se1Dist<-round(Se1Dist)
+
+Se2<-0
+Se2sd<-0
+Se2Dist<-rnorm(10000, mean=Se2, sd=Se2sd)
+Se2Dist[Se2Dist<0] <- 0
+Se2Dist<-round(Se2Dist)
+
+Se3<-0
+Se3sd<-0
+Se3Dist<-rnorm(10000, mean=Se3, sd=Se3sd)
+Se3Dist[Se3Dist<0] <- 0
+Se3Dist<-round(Se3Dist)
+
+
+#seed survival,no inbreeding coefficient possible
+SeSu<-.01 #1 in 10 seeds has a chance of germinating
+SeSuDist<-rbinom(1000000, size=1, prob=SeSu)
+
+
+
+#now, since some of those seeds will not be viable, because of hybridization
+#use the hybridization data from Toll & Willis (2017), as the arrays were
+#smaller and thus are closer to the actual expected hybridization for
+#an individual plant
+
+#HyO=viability (1-hybridization)
+HyO<-0.346
+#again a binomial
+HyODist<-rbinom(1000000, size=1, prob=HyO)
+
+#viability (1 - hybridization + other causes of shrivelled seeds)
+#increases with inbreeding, too, so we can scale better estimates of
+#viability from Toll and Willis 2018 (with smaller arrays in the opposite
+#habitats). For guttatus, we have the same sites (2nd stream) and for nudatus
+#bear meadow, which is not far from the overlook.
+#by the ratios compared to outcrossed viability (.57), so
+#1st gen, .54
+Hy1<-I(.54/.57)*HyO
+Hy2<-I(.27/.57)*HyO
+Hy3<-I(.29/.57)*HyO
+#that's a rough way to do it, but we know that inbreeding does increase
+#hybrid seed production, so its the best way we have come up with
+#to acccount for that
+Hy1Dist<-rbinom(1000000, size=1, prob=Hy1)
+Hy2Dist<-rbinom(1000000, size=1, prob=Hy2)
+Hy3Dist<-rbinom(1000000, size=1, prob=Hy3)
+
+
+#ok, so now we can make an estimate based on one seed landing in a new
+#environment and outcrossing for X generations
+
+#n=reps simulations of 1 seed
+sims<-rep(1, reps)
+simresults<-rep(1,reps)
+
+inbred<-as.data.frame(sims)
+colnames(inbred)<-("zerogen")
+
+
+#first gen of inbreeding
+for(i in 1:reps) {
+    int <- sum(sample(Ge1Dist, inbred$zerogen[i], replace=TRUE))
+sims[i]<-int }
+#number survived of those which germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(Su1Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#seed set of those survivors
+for(i in 1:reps) {
+    int <- sum(sample(Se1Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#viable seeds
+for(i in 1:reps) {
+    int <- sum(sample(Hy1Dist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+for(i in 1:reps) {
+    int2 <- sum(sample(SeSuDist, sims[i], replace=TRUE)) #sums whether each seed produced survives
+  sims[i]<-int2}
+
+
+inbred$firstgen<-as.vector(sims)
+
+#next
+for(i in 1:reps) {
+    int <- sum(sample(Ge2Dist, inbred$firstgen[i], replace=TRUE))
+sims[i]<-int }
+#number survived of those which germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(Su2Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#seed set of those survivors
+for(i in 1:reps) {
+    int <- sum(sample(Se2Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#viable seeds
+for(i in 1:reps) {
+    int <- sum(sample(Hy2Dist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+#seed survival
+for(i in 1:reps) {
+    int2 <- sum(sample(SeSuDist, sims[i], replace=TRUE)) #sums whether each seed produced survives
+  sims[i]<-int2}
+
+
+inbred$secondgen<-sims
+
+
+#now for third generation, split by stages
+#number germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(Ge3Dist, inbred$secondgen[i], replace=TRUE))
+sims[i]<-int }
+#number survived of those which germinated internally stored in sims
+for(i in 1:reps) {
+    int <- sum(sample(Su3Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#seed set of those survivors
+for(i in 1:reps) {
+    int <- sum(sample(Se3Dist, sims[i], replace=TRUE))
+sims[i]<-int }
+#viable seeds
+for(i in 1:reps) {
+    int <- sum(sample(Hy3Dist, sims[i], replace=TRUE)) #sums whether each seed produced is viable
+  sims[i]<-int}
+#seed survival
+for(i in 1:reps) {
+    int2 <- sum(sample(SeSuDist, sims[i], replace=TRUE)) #sums whether each seed produced survives
+  sims[i]<-int2}
+
+inbred$thirdgen<-sims
+
+
+# you can add to it
+matplot(t(inbred), type = "l", xlim=c(1,4), ylim=c(0,100),
+col = rgb(red = 0, green = 1, blue = 1, alpha = 0.1), add=TRUE)
+
+sum(inbred$firstgen==0, na.rm=TRUE)# in this sim 95%
+sum(inbred$secondgen==0, na.rm=TRUE)# in this sim 99%
+sum(inbred$thirdgen==0, na.rm=TRUE)# in this sim 100%
+
+text(x=c(2,3,3.75), y=c(7,7,7), c("In - 95%", "In - 99%", "In - 100%"))
+text(2.5, 20, "Guttatus, 2nd seep", cex=2)
+
+####
+#again, change name for file based on simulation, in this case nudatus
+#write.csv(inbred, file="InbredNudatus.csv")
+####
+
+
+sum(inbred$firstgen==0, na.rm=TRUE)# in this sim 99%
+sum(inbred$secondgen==0, na.rm=TRUE)# in this sim 99%
+sum(inbred$thirdgen==0, na.rm=TRUE)# in this sim 100%
+
+
+
+#surviving lines, mean #
+#inbreeding
+mean(inbred$firstgen[which(inbred$firstgen!=0)])# 1.19
+mean(inbred$secondgen[which(inbred$secondgen!=0)])# 1
+mean(inbred$thirdgen[which(inbred$thirdgen!=0)])#  NA
+#outcrossing
+mean(outcrossed$firstgen[which(outcrossed$firstgen!=0)])# 1.58
+mean(outcrossed$secondgen[which(outcrossed$secondgen!=0)])# 1.69
+mean(outcrossed$thirdgen[which(outcrossed$thirdgen!=0)]) # 1.87
